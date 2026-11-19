@@ -390,24 +390,129 @@ router.get(
   }
 );
 
-// Public: Get All Active Products (excludes raw digitalFiles.fileUrl for security)
+// Public: Get Dynamic Store Filter Options (Price Range, Colors, Sizes)
+router.get("/filter-options", async (req, res) => {
+  try {
+    const { productType } = req.query;
+    const matchStage = { isActive: true };
+    if (productType && productType !== "all") {
+      matchStage.productType = productType;
+    }
+
+    const activeProducts = await Product.find(matchStage).select(
+      "price color size productType"
+    );
+
+    const prices = activeProducts.map((item) => Number(item.price || 0));
+    const minPrice = prices.length ? Math.floor(Math.min(...prices)) : 0;
+    const maxPrice = prices.length ? Math.ceil(Math.max(...prices)) : 0;
+
+    const colorSet = new Set();
+    const sizeSet = new Set();
+
+    for (const item of activeProducts) {
+      if (Array.isArray(item.color)) {
+        item.color.forEach((c) => c && colorSet.add(c.trim()));
+      }
+      if (Array.isArray(item.size)) {
+        item.size.forEach((s) => s && sizeSet.add(s.trim()));
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        minPrice,
+        maxPrice,
+        colors: Array.from(colorSet).sort(),
+        sizes: Array.from(sizeSet),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Public: Get All Active Products (with dynamic filtering & sorting)
 router.get("/get-all-products", async (req, res) => {
   try {
-    const { productType, category, featured, search } = req.query;
+    const {
+      productType,
+      category,
+      featured,
+      search,
+      minPrice,
+      maxPrice,
+      color,
+      size,
+      sort,
+    } = req.query;
+
     const filter = { isActive: true };
 
-    if (productType) filter.productType = productType;
+    if (productType && productType !== "all") filter.productType = productType;
     if (category) filter.categories = category;
     if (featured === "true") filter.isFeatured = true;
-    if (search) {
-      filter.productName = { $regex: search, $options: "i" };
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      filter.price = {};
+      if (minPrice !== undefined && minPrice !== "") {
+        filter.price.$gte = Number(minPrice);
+      }
+      if (maxPrice !== undefined && maxPrice !== "") {
+        filter.price.$lte = Number(maxPrice);
+      }
+      if (Object.keys(filter.price).length === 0) {
+        delete filter.price;
+      }
     }
+
+    if (color) {
+      const colors = String(color)
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean);
+      if (colors.length > 0) {
+        filter.color = {
+          $in: colors.map((c) => new RegExp("^" + c + "$", "i")),
+        };
+      }
+    }
+
+    if (size) {
+      const sizes = String(size)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (sizes.length > 0) {
+        filter.size = {
+          $in: sizes.map((s) => new RegExp("^" + s + "$", "i")),
+        };
+      }
+    }
+
+    if (search) {
+      filter.$or = [
+        { productName: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { artist: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const sortMap = {
+      newest: { createdAt: -1 },
+      popular: { sold: -1, createdAt: -1 },
+      "price-asc": { price: 1 },
+      "price-desc": { price: -1 },
+      "name-asc": { productName: 1 },
+    };
+    const sortQuery = sortMap[sort] || { createdAt: -1 };
 
     const products = await Product.find(filter)
       .select("-digitalFiles.fileUrl -digitalFiles.publicId")
       .populate("categories")
       .populate("discounts")
-      .sort({ createdAt: -1 });
+      .sort(sortQuery);
 
     res.json({ success: true, data: products });
   } catch (error) {

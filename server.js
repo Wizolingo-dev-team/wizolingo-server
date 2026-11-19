@@ -58,6 +58,7 @@ const wishlistRoute = require("./routes/wishlistRoute");
 const orderRoute = require("./routes/orderRoute");
 const paymentsRoute = require("./routes/paymentsRoute");
 const newsletterRoute = require("./routes/newsletterRoute");
+const eventsRoute = require("./routes/eventsRoute");
 const activityRoute = require("./routes/activityRoute");
 
 app.get("/", (req, res) => {
@@ -77,6 +78,7 @@ app.use("/api/wishlists", wishlistRoute);
 app.use("/api/order", orderRoute);
 app.use("/api/payment", paymentsRoute.router);
 app.use("/api/newsletter", newsletterRoute);
+app.use("/api/events", eventsRoute);
 app.use("/api/activity", activityRoute);
 
 const port = process.env.PORT || 6000;

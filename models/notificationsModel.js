@@ -20,7 +20,7 @@ const notificationsSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["order", "download", "newsletter", "auth", "system"],
+      enum: ["order", "download", "event", "newsletter", "auth", "system"],
       default: "system",
     },
     onClick: {

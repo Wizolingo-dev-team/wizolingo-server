@@ -188,6 +188,37 @@ const emailServices = {
     `;
     return sendEmail(email, subject, footerHtml, true);
   },
+
+  sendTicketConfirmation: async (email, ticketOrder, event) => {
+    const html = `
+      <h2 style="color: ${SECONDARY_COLOR};">Event Ticket Order Received!</h2>
+      <p>Hi <strong>${ticketOrder.attendeeName}</strong>, your ticket reservation for <strong>${event.title}</strong> has been created.</p>
+      <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <p style="margin: 5px 0;"><strong>Ticket Code:</strong> ${ticketOrder.ticketCode}</p>
+        <p style="margin: 5px 0;"><strong>Venue:</strong> ${event.venue}, ${event.location}</p>
+        <p style="margin: 5px 0;"><strong>Date &amp; Time:</strong> ${event.dateLabel || new Date(event.startDate).toDateString()} ${event.time ? `at ${event.time}` : ""}</p>
+        <p style="margin: 5px 0;"><strong>Total Amount:</strong> $${Number(ticketOrder.totalAmount || 0).toFixed(2)} ${ticketOrder.currency}</p>
+        <p style="margin: 5px 0;"><strong>Status:</strong> ${ticketOrder.status}</p>
+      </div>
+      <p>Present your Ticket Code at the venue once payment is confirmed.</p>
+    `;
+    await sendEmail(email, `Ticket Reservation: ${event.title}`, html);
+  },
+
+  sendAdminTicketNotification: async (ticketOrder, event) => {
+    if (!process.env.RESEND_TO_EMAIL) return;
+    const html = `
+      <h2 style="color: ${SECONDARY_COLOR};">New Event Ticket Sale</h2>
+      <p>A new ticket order was placed for <strong>${event.title}</strong>.</p>
+      <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <p style="margin: 5px 0;"><strong>Attendee:</strong> ${ticketOrder.attendeeName} (${ticketOrder.email})</p>
+        <p style="margin: 5px 0;"><strong>Ticket Code:</strong> ${ticketOrder.ticketCode}</p>
+        <p style="margin: 5px 0;"><strong>Total Amount:</strong> $${Number(ticketOrder.totalAmount || 0).toFixed(2)} ${ticketOrder.currency}</p>
+      </div>
+      <a href="${ADMIN_FRONTEND_URL}/events" style="color: ${BRAND_COLOR}; font-weight: bold;">View Ticket Sales in Admin Dashboard</a>
+    `;
+    await sendEmail(process.env.RESEND_TO_EMAIL, `New Ticket Sale: ${event.title}`, html);
+  },
 };
 
 module.exports = emailServices;

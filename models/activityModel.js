@@ -16,6 +16,7 @@ const activitySchema = new mongoose.Schema(
         "ADMIN_LOGIN",
         "ORDER_CREATED",
         "PAYMENT_COMPLETED",
+        "TICKET_PURCHASED",
         "DIGITAL_DOWNLOADED",
         "WISHLIST_UPDATED",
         "LOGOUT",
