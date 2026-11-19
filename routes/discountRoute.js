@@ -20,6 +20,21 @@ router.post("/create", authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
+// Public / User: Get active non-expired discounts with populated products
+router.get("/active", async (req, res) => {
+  try {
+    const discounts = await Discount.find({
+      isActive: true,
+      expiryDate: { $gt: new Date() },
+    })
+      .populate("products")
+      .sort({ expiryDate: 1 });
+    res.json({ success: true, data: discounts });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Admin: Get all discounts
 router.get(
   "/admin/all",

@@ -7,7 +7,9 @@ const SECONDARY_COLOR = "#141414";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 const ADMIN_FRONTEND_URL =
-  process.env.ADMIN_FRONTEND_URL || "http://localhost:3001";
+  process.env.ADMIN_URL ||
+  process.env.ADMIN_FRONTEND_URL ||
+  "http://localhost:3001";
 
 const getResendClient = () => {
   if (!process.env.RESEND_API_KEY) {
