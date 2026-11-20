@@ -1,11 +1,22 @@
 // models/eventModel.js
 const mongoose = require("mongoose");
 
+const showTimeSchema = new mongoose.Schema(
+  {
+    time: { type: String, required: true, trim: true }, // e.g. "10:00 PM"
+    timezone: { type: String, default: "", trim: true }, // e.g. "WAT", "CET", "GMT", "EST"
+    label: { type: String, default: "", trim: true }, // e.g. "Early Show", "Main Set", "Doors Open"
+  },
+  { _id: true }
+);
+
 const eventArtistSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     stage: { type: String, default: "Main stage", trim: true },
     performanceTime: { type: String, default: "", trim: true },
+    timezone: { type: String, default: "", trim: true },
+    showTimes: { type: [showTimeSchema], default: [] },
     imageUrl: { type: String, default: "" },
   },
   { _id: true }
@@ -39,6 +50,8 @@ const eventSchema = new mongoose.Schema(
     endDate: { type: Date },
     dateLabel: { type: String, default: "", trim: true }, // e.g. "22/08/2024 TO 22/03/2028"
     time: { type: String, default: "", trim: true }, // e.g. "10 PM"
+    timezone: { type: String, default: "", trim: true }, // e.g. "WAT", "CET", "GMT", "EST"
+    showTimes: { type: [showTimeSchema], default: [] },
     venue: { type: String, required: true, trim: true },
     location: { type: String, required: true, trim: true }, // e.g. "LONDON, ENGLAND"
     mapEmbedUrl: { type: String, default: "", trim: true }, // Admin-embedded Google Map URL/iframe src

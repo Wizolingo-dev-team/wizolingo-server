@@ -325,6 +325,37 @@ router.get("/my-tickets", authMiddleware, async (req, res) => {
   }
 });
 
+// Public: Verify ticket status by ticketCode (for QR/barcode scan)
+router.get("/verify-ticket/:ticketCode", async (req, res) => {
+  try {
+    const code = String(req.params.ticketCode || "")
+      .trim()
+      .toUpperCase();
+    if (!code) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Ticket code is required" });
+    }
+
+    const ticket = await TicketOrder.findOne({ ticketCode: code })
+      .populate(
+        "event",
+        "title slug venue location startDate endDate dateLabel time flyerUrl"
+      )
+      .select("-email -phone -__v");
+
+    if (!ticket) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Ticket not found" });
+    }
+
+    res.json({ success: true, data: ticket });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ==========================================
 // ADMIN EVENTS CRUD & TICKET SALES MANAGEMENT
 // ==========================================
@@ -334,7 +365,10 @@ router.post(
   "/admin/create",
   authMiddleware,
   adminMiddleware,
-  upload.fields([{ name: "flyer", maxCount: 1 }]),
+  upload.fields([
+    { name: "flyer", maxCount: 1 },
+    { name: "artistImages", maxCount: 20 },
+  ]),
   async (req, res) => {
     try {
       const {
@@ -345,6 +379,8 @@ router.post(
         endDate,
         dateLabel,
         time,
+        timezone,
+        showTimes,
         venue,
         location,
         mapEmbedUrl,
@@ -385,6 +421,45 @@ router.post(
         ? `${baseSlug}-${Date.now().toString().slice(-4)}`
         : baseSlug;
 
+      const rawArtists = parseJsonField(artists, []);
+      const parsedArtists = Array.isArray(rawArtists)
+        ? rawArtists.map((artist) => {
+            const cleanedTimes = Array.isArray(artist?.showTimes)
+              ? artist.showTimes.filter((st) => st && st.time)
+              : [];
+            return {
+              ...artist,
+              showTimes: cleanedTimes,
+              performanceTime:
+                cleanedTimes[0]?.time || artist?.performanceTime || "",
+              timezone: cleanedTimes[0]?.timezone || artist?.timezone || "",
+            };
+          })
+        : [];
+      const artistImageFiles = req.files?.artistImages || [];
+      const artistImageIndexes = parseJsonField(req.body.artistImageIndexes, []);
+
+      if (artistImageFiles.length > 0 && Array.isArray(parsedArtists)) {
+        await Promise.all(
+          artistImageFiles.map(async (file, fileIdx) => {
+            const targetIdx = artistImageIndexes[fileIdx];
+            if (typeof targetIdx === "number" && parsedArtists[targetIdx]) {
+              const uploadRes = await uploadToCloudinary(
+                file,
+                "wizolingo/event-artists"
+              );
+              parsedArtists[targetIdx].imageUrl = uploadRes.secure_url;
+            }
+          })
+        );
+      }
+
+      const parsedShowTimes = Array.isArray(parseJsonField(showTimes, []))
+        ? parseJsonField(showTimes, []).filter((item) => item && item.time)
+        : [];
+      const primaryTime = parsedShowTimes[0]?.time || time || "";
+      const primaryTimezone = parsedShowTimes[0]?.timezone || timezone || "";
+
       const newEvent = new Event({
         title,
         slug: finalSlug,
@@ -392,7 +467,9 @@ router.post(
         startDate: new Date(startDate),
         endDate: endDate ? new Date(endDate) : undefined,
         dateLabel: dateLabel || "",
-        time: time || "",
+        time: primaryTime,
+        timezone: primaryTimezone,
+        showTimes: parsedShowTimes,
         venue,
         location,
         mapEmbedUrl: mapEmbedUrl || "",
@@ -403,7 +480,7 @@ router.post(
         websiteUrl: websiteUrl || "",
         organizedBy: organizedBy || "Wizolingo Music",
         flyerUrl: resolvedFlyerUrl,
-        artists: parseJsonField(artists, []),
+        artists: parsedArtists,
         ticketTiers: parseJsonField(ticketTiers, []),
         isFeatured: isFeatured === "true" || isFeatured === true,
         isActive: isActive !== undefined ? isActive === "true" || isActive === true : true,
@@ -443,7 +520,10 @@ router.put(
   "/admin/update/:id",
   authMiddleware,
   adminMiddleware,
-  upload.fields([{ name: "flyer", maxCount: 1 }]),
+  upload.fields([
+    { name: "flyer", maxCount: 1 },
+    { name: "artistImages", maxCount: 20 },
+  ]),
   async (req, res) => {
     try {
       const event = await Event.findById(req.params.id);
@@ -464,10 +544,58 @@ router.put(
       }
 
       if (updateFields.artists !== undefined) {
-        updateFields.artists = parseJsonField(updateFields.artists, []);
+        const rawArtists = parseJsonField(updateFields.artists, []);
+        updateFields.artists = Array.isArray(rawArtists)
+          ? rawArtists.map((artist) => {
+              const cleanedTimes = Array.isArray(artist?.showTimes)
+                ? artist.showTimes.filter((st) => st && st.time)
+                : [];
+              return {
+                ...artist,
+                showTimes: cleanedTimes,
+                performanceTime:
+                  cleanedTimes[0]?.time || artist?.performanceTime || "",
+                timezone: cleanedTimes[0]?.timezone || artist?.timezone || "",
+              };
+            })
+          : [];
       }
+      const artistImageFiles = req.files?.artistImages || [];
+      const artistImageIndexes = parseJsonField(req.body.artistImageIndexes, []);
+      if (
+        artistImageFiles.length > 0 &&
+        Array.isArray(updateFields.artists)
+      ) {
+        await Promise.all(
+          artistImageFiles.map(async (file, fileIdx) => {
+            const targetIdx = artistImageIndexes[fileIdx];
+            if (typeof targetIdx === "number" && updateFields.artists[targetIdx]) {
+              const uploadRes = await uploadToCloudinary(
+                file,
+                "wizolingo/event-artists"
+              );
+              updateFields.artists[targetIdx].imageUrl = uploadRes.secure_url;
+            }
+          })
+        );
+      }
+      delete updateFields.artistImageIndexes;
       if (updateFields.ticketTiers !== undefined) {
         updateFields.ticketTiers = parseJsonField(updateFields.ticketTiers, []);
+      }
+      if (updateFields.showTimes !== undefined) {
+        const rawShowTimes = parseJsonField(updateFields.showTimes, []);
+        const parsedShowTimes = Array.isArray(rawShowTimes)
+          ? rawShowTimes.filter((item) => item && item.time)
+          : [];
+        updateFields.showTimes = parsedShowTimes;
+        if (parsedShowTimes.length > 0) {
+          updateFields.time = parsedShowTimes[0].time;
+          updateFields.timezone = parsedShowTimes[0].timezone || "";
+        } else {
+          updateFields.time = updateFields.time ?? "";
+          updateFields.timezone = updateFields.timezone ?? "";
+        }
       }
       if (updateFields.startDate) {
         updateFields.startDate = new Date(updateFields.startDate);

@@ -55,26 +55,34 @@ router.post("/subscribe", async (req, res) => {
       await subscriber.save();
     }
 
-    // Send welcome email via Resend
-    await emailServices.sendNewsletterWelcome(
-      subscriber.email,
-      subscriber.unsubscribeToken
-    );
+    // Send welcome email via Resend (non-blocking if email service fails)
+    try {
+      await emailServices.sendNewsletterWelcome(
+        subscriber.email,
+        subscriber.unsubscribeToken
+      );
+    } catch (emailErr) {
+      console.error("Newsletter welcome email failed:", emailErr.message);
+    }
 
     // Notify Admins in-app
-    const admins = await User.find({ role: "admin" }).select("_id");
-    for (const admin of admins) {
-      const notif = new Notification({
-        user: admin._id,
-        title: "New Newsletter Subscriber",
-        description: `${subscriber.email} joined the Wizolingo Inner Circle.`,
-        type: "newsletter",
-        onClick: "/admin/newsletter",
-      });
-      await notif.save();
-      if (req.io) {
-        req.io.to(admin._id.toString()).emit("new-notification", notif);
+    try {
+      const admins = await User.find({ role: "admin" }).select("_id");
+      for (const admin of admins) {
+        const notif = new Notification({
+          user: admin._id,
+          title: "New Newsletter Subscriber",
+          description: `${subscriber.email} joined the Wizolingo Inner Circle.`,
+          type: "newsletter",
+          onClick: "/newsletter-management",
+        });
+        await notif.save();
+        if (req.io) {
+          req.io.to(admin._id.toString()).emit("new-notification", notif);
+        }
       }
+    } catch (notifErr) {
+      console.error("Newsletter admin notification failed:", notifErr.message);
     }
 
     res.status(201).json({
