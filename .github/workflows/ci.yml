@@ -1,0 +1,130 @@
+name: CI / QA Pipeline
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - development
+      - staging
+      - stagging
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Target environment for Performance tests"
+        required: true
+        default: "local"
+        type: choice
+        options:
+          - local
+          - staging
+          - production
+
+jobs:
+  lint-unit-integration:
+    name: Lint, Unit & Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci || npm install --no-audit --no-fund
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Unit Tests
+        run: npm run test:unit
+
+      - name: Run Integration Tests
+        run: npm run test:integration
+
+  e2e-and-performance:
+    name: E2E & HTTP Performance Tests
+    needs: lint-unit-integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci || npm install --no-audit --no-fund
+
+      - name: Run E2E Tests
+        run: npm run test:e2e
+
+      - name: Resolve Performance Base URL
+        id: target
+        run: |
+          if [ "${{ github.event.inputs.target_env }}" = "production" ]; then
+            echo "url=${{ secrets.PROD_SERVER_URL }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.inputs.target_env }}" = "staging" ]; then
+            echo "url=${{ secrets.STAGING_SERVER_URL }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "url=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Performance & Latency Tests
+        run: npm run test:perf
+        env:
+          PERF_BASE_URL: ${{ steps.target.outputs.url }}
+
+      - name: Upload Performance Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-report
+          path: perf-report/
+          retention-days: 7
+
+  ship-staging:
+    name: Ship Staging to Render
+    needs: e2e-and-performance
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/stagging' || github.ref == 'refs/heads/staging')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render Staging Deploy Hook (if configured)
+        env:
+          RENDER_STAGING_DEPLOY_HOOK_URL: ${{ secrets.RENDER_STAGING_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$RENDER_STAGING_DEPLOY_HOOK_URL" ]; then
+            curl -fsS -X POST "$RENDER_STAGING_DEPLOY_HOOK_URL"
+            echo "Triggered Render Staging deployment."
+          else
+            echo "RENDER_STAGING_DEPLOY_HOOK_URL not set; all QA gates passed for staging."
+          fi
+
+  ship:
+    name: Ship Production to Render
+    needs: e2e-and-performance
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render Production Deploy Hook (if configured)
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
+            curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+            echo "Triggered Render Production deployment."
+          else
+            echo "RENDER_DEPLOY_HOOK_URL not set; all QA gates passed and ready to ship."
+          fi
+

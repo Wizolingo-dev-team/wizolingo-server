@@ -26,7 +26,9 @@ module.exports = (req, res, next) => {
     if (!req.body) {
       req.body = {};
     }
-    req.body.userId = decryptedToken.userId;
+    if (!req.body.userId) {
+      req.body.userId = decryptedToken.userId;
+    }
     req.user = decryptedToken;
 
     next();
