@@ -92,20 +92,38 @@ jobs:
           path: perf-report/
           retention-days: 7
 
+  ship-staging:
+    name: Ship Staging to Render
+    needs: e2e-and-performance
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/stagging' || github.ref == 'refs/heads/staging')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render Staging Deploy Hook (if configured)
+        env:
+          RENDER_STAGING_DEPLOY_HOOK_URL: ${{ secrets.RENDER_STAGING_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$RENDER_STAGING_DEPLOY_HOOK_URL" ]; then
+            curl -fsS -X POST "$RENDER_STAGING_DEPLOY_HOOK_URL"
+            echo "Triggered Render Staging deployment."
+          else
+            echo "RENDER_STAGING_DEPLOY_HOOK_URL not set; all QA gates passed for staging."
+          fi
+
   ship:
-    name: Ship to Render
+    name: Ship Production to Render
     needs: e2e-and-performance
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Trigger Render Deploy Hook (if configured)
+      - name: Trigger Render Production Deploy Hook (if configured)
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
           if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
             curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
-            echo "Triggered Render deployment."
+            echo "Triggered Render Production deployment."
           else
             echo "RENDER_DEPLOY_HOOK_URL not set; all QA gates passed and ready to ship."
           fi
