@@ -237,7 +237,7 @@ router.post(
   adminMiddleware,
   async (req, res) => {
     try {
-      const { userId, title, description, type, onClick } = req.body;
+      const { targetUserId, userId, title, description, type, onClick } = req.body;
       if (!title || !description) {
         return res.status(400).send({
           success: false,
@@ -245,9 +245,15 @@ router.post(
         });
       }
 
+      const explicitTarget =
+        targetUserId ||
+        (userId && userId.toString() !== req.user.userId.toString()
+          ? userId
+          : null);
+
       let targetUserIds = [];
-      if (userId) {
-        targetUserIds = [userId];
+      if (explicitTarget) {
+        targetUserIds = [explicitTarget];
       } else {
         const users = await User.find({ role: "user" }).select("_id");
         targetUserIds = users.map((u) => u._id);
