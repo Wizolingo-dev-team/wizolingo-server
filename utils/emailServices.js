@@ -221,6 +221,45 @@ const emailServices = {
     `;
     await sendEmail(process.env.RESEND_TO_EMAIL, `New Ticket Sale: ${event.title}`, html);
   },
+
+  sendBookingInquiryConfirmation: async (booking) => {
+    const html = `
+      <h2 style="color: ${SECONDARY_COLOR};">Booking Inquiry Received!</h2>
+      <p>Hi <strong>${booking.fullName}</strong>,</p>
+      <p>Thank you for reaching out to Wiz Ofuasia (Wizboyy) management. We have received your booking inquiry and our management team will review your event details and respond shortly.</p>
+      <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <p style="margin: 5px 0;"><strong>Event Type:</strong> ${booking.eventType}</p>
+        ${booking.eventDate ? `<p style="margin: 5px 0;"><strong>Preferred Date:</strong> ${booking.eventDate}</p>` : ""}
+        ${booking.country ? `<p style="margin: 5px 0;"><strong>Country / City:</strong> ${booking.country}</p>` : ""}
+        <p style="margin: 5px 0;"><strong>Status:</strong> ${booking.status}</p>
+      </div>
+      <p style="color: #666; font-size: 13px;">If you have any urgent updates or questions regarding this booking, feel free to reply directly to this email.</p>
+    `;
+    return sendEmail(booking.email, `Booking Inquiry Received — Wiz Ofuasia`, html);
+  },
+
+  sendAdminBookingNotification: async (booking) => {
+    const adminEmail = process.env.RESEND_TO_EMAIL || "Officialwizboyy@gmail.com";
+    const html = `
+      <h2 style="color: ${SECONDARY_COLOR};">New Booking Inquiry</h2>
+      <p>A new booking inquiry has been submitted through the Wizolingo official website.</p>
+      <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <p style="margin: 5px 0;"><strong>Client Name:</strong> ${booking.fullName}</p>
+        <p style="margin: 5px 0;"><strong>Email:</strong> ${booking.email}</p>
+        ${booking.phone ? `<p style="margin: 5px 0;"><strong>Phone:</strong> ${booking.phone}</p>` : ""}
+        <p style="margin: 5px 0;"><strong>Event Type:</strong> ${booking.eventType}</p>
+        ${booking.eventDate ? `<p style="margin: 5px 0;"><strong>Preferred Date:</strong> ${booking.eventDate}</p>` : ""}
+        ${booking.country ? `<p style="margin: 5px 0;"><strong>Location:</strong> ${booking.country}</p>` : ""}
+        ${booking.budget ? `<p style="margin: 5px 0;"><strong>Budget:</strong> ${booking.budget}</p>` : ""}
+        <p style="margin: 10px 0 5px 0;"><strong>Message:</strong></p>
+        <div style="background: #ffffff; padding: 10px; border-left: 3px solid ${BRAND_COLOR}; font-style: italic;">
+          ${booking.message}
+        </div>
+      </div>
+      <p><a href="${ADMIN_FRONTEND_URL}/bookings" style="display: inline-block; background-color: ${BRAND_COLOR}; color: #ffffff; padding: 10px 18px; text-decoration: none; border-radius: 4px; font-weight: bold;">View Bookings in Admin Dashboard</a></p>
+    `;
+    return sendEmail(adminEmail, `New Booking Inquiry from ${booking.fullName} (${booking.eventType})`, html);
+  },
 };
 
 module.exports = emailServices;

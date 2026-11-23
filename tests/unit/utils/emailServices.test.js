@@ -88,8 +88,26 @@ describe("utils/emailServices", () => {
       },
       { title: "London Live" }
     );
+    await emailServices.sendBookingInquiryConfirmation({
+      fullName: "Festival Booker",
+      email: "booker@fest.com",
+      eventType: "festival",
+      eventDate: "2026-12-10",
+      country: "London",
+      status: "pending",
+    });
+    await emailServices.sendAdminBookingNotification({
+      fullName: "Festival Booker",
+      email: "booker@fest.com",
+      phone: "+44 123456",
+      eventType: "festival",
+      eventDate: "2026-12-10",
+      country: "London",
+      budget: "$20,000",
+      message: "Headline booking request",
+    });
 
-    expect(sendSpy).toHaveBeenCalledTimes(11);
+    expect(sendSpy).toHaveBeenCalledTimes(13);
     const firstCall = sendSpy.mock.calls[0][0];
     expect(firstCall.html).toContain("Wiz Ofuasia (Wizboyy)");
   });
