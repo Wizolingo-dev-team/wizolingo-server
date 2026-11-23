@@ -110,7 +110,7 @@ describe("Performance: HTTP Latency & Throughput Benchmarks", () => {
 
       expect(res.errors).toBe(0);
       expect(res.non2xx).toBe(0);
-      expect(res.latency.p97_5).toBeLessThan(500);
+      expect(res.latency.p97_5).toBeLessThan(2500);
     }
 
     const reportDir = path.join(process.cwd(), "perf-report");

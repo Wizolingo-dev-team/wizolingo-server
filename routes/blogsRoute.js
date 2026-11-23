@@ -7,6 +7,7 @@ const Activity = require("../models/activityModel");
 const authMiddleware = require("../middlewares/authMiddleware");
 const adminMiddleware = require("../middlewares/adminMiddleware");
 const cloudinary = require("../config/cloudinaryConfig");
+const { optimizeImageBuffer } = require("../helpers/imageOptimizer");
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -14,8 +15,9 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
 });
 
-const uploadToCloudinary = (buffer, folder = "wizolingo/blogs") =>
-  new Promise((resolve, reject) => {
+const uploadToCloudinary = async (rawBuffer, folder = "wizolingo/blogs") => {
+  const buffer = await optimizeImageBuffer(rawBuffer);
+  return new Promise((resolve, reject) => {
     cloudinary.uploader
       .upload_stream(
         { resource_type: "auto", folder },
@@ -26,6 +28,7 @@ const uploadToCloudinary = (buffer, folder = "wizolingo/blogs") =>
       )
       .end(buffer);
   });
+};
 
 const generateSlug = (text) =>
   text
