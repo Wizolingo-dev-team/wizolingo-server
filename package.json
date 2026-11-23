@@ -8,6 +8,7 @@
   "main": "index.js",
   "scripts": {
     "start": "nodemon server.js",
+    "seed:blogs": "node scripts/seedBlogs.js",
     "lint": "eslint .",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",

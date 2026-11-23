@@ -35,6 +35,8 @@ const createApp = (io = null) => {
   const newsletterRoute = require("./routes/newsletterRoute");
   const eventsRoute = require("./routes/eventsRoute");
   const activityRoute = require("./routes/activityRoute");
+  const blogsRoute = require("./routes/blogsRoute");
+  const bookingsRoute = require("./routes/bookingsRoute");
 
   app.get("/", (req, res) => {
     res.json({
@@ -55,6 +57,8 @@ const createApp = (io = null) => {
   app.use("/api/newsletter", newsletterRoute);
   app.use("/api/events", eventsRoute);
   app.use("/api/activity", activityRoute);
+  app.use("/api/blogs", blogsRoute);
+  app.use("/api/bookings", bookingsRoute);
 
   return app;
 };

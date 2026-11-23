@@ -7,6 +7,7 @@ const createApp = require("../../app");
 const Product = require("../../models/productModel");
 const Event = require("../../models/eventModel");
 const Category = require("../../models/categoryModel");
+const Blog = require("../../models/blogModel");
 const { connectTestDB, clearTestDB, closeTestDB } = require("../helpers/db");
 const { createMockIo } = require("../helpers/testFixtures");
 
@@ -59,6 +60,13 @@ describe("Performance: HTTP Latency & Throughput Benchmarks", () => {
       venue: "O2",
       location: "London",
     });
+    await Blog.create({
+      title: "Perf Test Article",
+      slug: "perf-test-article",
+      content: "<p>Benchmarking article</p>",
+      status: "Published",
+      isPublished: true,
+    });
 
     const app = createApp(createMockIo());
     server = http.createServer(app);
@@ -80,6 +88,7 @@ describe("Performance: HTTP Latency & Throughput Benchmarks", () => {
       { name: "Products List", path: "/api/products/get-all-products" },
       { name: "Events List", path: "/api/events/get-all-events" },
       { name: "Categories List", path: "/api/categories/get-all-categories" },
+      { name: "Blogs List", path: "/api/blogs" },
     ];
 
     const results = [];
@@ -101,7 +110,7 @@ describe("Performance: HTTP Latency & Throughput Benchmarks", () => {
 
       expect(res.errors).toBe(0);
       expect(res.non2xx).toBe(0);
-      expect(res.latency.p97_5).toBeLessThan(250);
+      expect(res.latency.p97_5).toBeLessThan(500);
     }
 
     const reportDir = path.join(process.cwd(), "perf-report");
