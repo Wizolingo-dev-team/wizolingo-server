@@ -65,6 +65,42 @@ const calculateReadTime = (content) => {
   return `${minutes} min read`;
 };
 
+const resolveBlogDates = (inputDate, inputIsoDate) => {
+  const raw = (inputIsoDate || inputDate || "").toString().trim();
+  if (!raw) {
+    const now = new Date();
+    return {
+      date: now.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }),
+      isoDate: now.toISOString(),
+    };
+  }
+
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
+  const parsed = isDateOnly ? new Date(`${raw}T12:00:00.000Z`) : new Date(raw);
+
+  if (!Number.isNaN(parsed.getTime())) {
+    return {
+      date: parsed.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "UTC",
+      }),
+      isoDate: parsed.toISOString(),
+    };
+  }
+
+  const fallbackNow = new Date();
+  return {
+    date: inputDate || fallbackNow.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+    isoDate: inputIsoDate || fallbackNow.toISOString(),
+  };
+};
+
 // ==========================================
 // PUBLIC ROUTES
 // ==========================================
@@ -110,7 +146,7 @@ router.get("/", async (req, res) => {
     const limitNum = Math.max(1, parseInt(limit, 10));
 
     const [blogs, total] = await Promise.all([
-      Blog.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum),
+      Blog.find(query).sort({ isoDate: -1, createdAt: -1 }).skip(skip).limit(limitNum),
       Blog.countDocuments(query),
     ]);
 
@@ -208,7 +244,7 @@ router.get("/admin/all", authMiddleware, adminMiddleware, async (req, res) => {
     const limitNum = Math.max(1, parseInt(limit, 10));
 
     const [blogs, total] = await Promise.all([
-      Blog.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum),
+      Blog.find(query).sort({ isoDate: -1, createdAt: -1 }).skip(skip).limit(limitNum),
       Blog.countDocuments(query),
     ]);
 
@@ -265,6 +301,8 @@ router.post(
         tags,
         status = "Published",
         readTime,
+        date,
+        isoDate,
       } = req.body;
 
       if (!title || !content) {
@@ -305,12 +343,7 @@ router.post(
           .trim()
           .slice(0, 180) + "...";
 
-      const now = new Date();
-      const formattedDate = now.toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      });
+      const { date: formattedDate, isoDate: resolvedIsoDate } = resolveBlogDates(date, isoDate);
 
       const blog = new Blog({
         title,
@@ -326,7 +359,7 @@ router.post(
         status,
         isPublished: status === "Published",
         date: formattedDate,
-        isoDate: now.toISOString(),
+        isoDate: resolvedIsoDate,
         createdBy: req.user?.userId || null,
       });
 
@@ -384,6 +417,8 @@ router.put(
         status,
         readTime,
         coverImageUrl,
+        date,
+        isoDate,
       } = req.body;
 
       if (title) blog.title = title;
@@ -415,6 +450,12 @@ router.put(
 
       if (tags !== undefined) {
         blog.tags = parseTags(tags);
+      }
+
+      if (date !== undefined || isoDate !== undefined) {
+        const { date: resolvedDate, isoDate: resolvedIsoDate } = resolveBlogDates(date, isoDate);
+        blog.date = resolvedDate;
+        blog.isoDate = resolvedIsoDate;
       }
 
       // Handle cover image replacement
